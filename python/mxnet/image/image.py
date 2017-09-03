@@ -1125,18 +1125,18 @@ class ImageIter(io.DataIter):
                 s = self.imgrec.read_idx(idx)
                 header, img = recordio.unpack(s)
                 if self.imglist is None:
-                    return header.label, img
+                    return header.label, img, idx
                 else:
-                    return self.imglist[idx][0], img
+                    return self.imglist[idx][0], img, idx
             else:
                 label, fname = self.imglist[idx]
-                return label, self.read_image(fname)
+                return label, self.read_image(fname), idx
         else:
             s = self.imgrec.read()
             if s is None:
                 raise StopIteration
             header, img = recordio.unpack(s)
-            return header.label, img
+            return header.label, img, None
 
     def next(self):
         """Returns the next batch of data."""
@@ -1144,10 +1144,11 @@ class ImageIter(io.DataIter):
         c, h, w = self.data_shape
         batch_data = nd.empty((batch_size, c, h, w))
         batch_label = nd.empty(self.provide_label[0][1])
+        batch_idx = nd.empty(batch_size) 
         i = 0
         try:
             while i < batch_size:
-                label, s = self.next_sample()
+                label, s, idx = self.next_sample()
                 data = self.imdecode(s)
                 try:
                     self.check_valid_image(data)
@@ -1158,12 +1159,13 @@ class ImageIter(io.DataIter):
                 assert i < batch_size, 'Batch size must be multiples of augmenter output length'
                 batch_data[i] = self.postprocess_data(data)
                 batch_label[i] = label
+                batch_size[i] = idx
                 i += 1
         except StopIteration:
             if not i:
                 raise StopIteration
 
-        return io.DataBatch([batch_data], [batch_label], batch_size - i)
+        return io.DataBatch([batch_data], [batch_label], batch_size - i, [batch_idx])
 
     def check_data_shape(self, data_shape):
         """Checks if the input data shape is valid"""
